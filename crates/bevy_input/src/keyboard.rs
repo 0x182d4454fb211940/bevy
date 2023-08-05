@@ -28,7 +28,7 @@ use bevy_reflect::{ReflectDeserialize, ReflectSerialize};
 )]
 pub struct KeyboardInput {
     /// The scan code of the key.
-    pub scan_code: u32,
+    pub physical_key: Option<KeyCode>,
     /// The key code of the key.
     pub key_code: Option<KeyCode>,
     /// The press state of the key.
@@ -53,7 +53,9 @@ pub fn keyboard_input_system(
     key_input.bypass_change_detection().clear();
     for event in keyboard_input_events.iter() {
         let KeyboardInput {
-            scan_code, state, ..
+            physical_key,
+            state,
+            ..
         } = event;
         if let Some(key_code) = event.key_code {
             match state {
@@ -62,8 +64,8 @@ pub fn keyboard_input_system(
             }
         }
         match state {
-            ButtonState::Pressed => scan_input.press(ScanCode(*scan_code)),
-            ButtonState::Released => scan_input.release(ScanCode(*scan_code)),
+            ButtonState::Pressed => scan_input.press(ScanCode(*physical_key)),
+            ButtonState::Released => scan_input.release(ScanCode(*physical_key)),
         }
     }
 }
@@ -458,4 +460,4 @@ pub enum KeyCode {
     derive(serde::Serialize, serde::Deserialize),
     reflect(Serialize, Deserialize)
 )]
-pub struct ScanCode(pub u32);
+pub struct ScanCode(pub Option<KeyCode>);

@@ -15,6 +15,7 @@ mod winit_config;
 mod winit_windows;
 
 use system::{changed_windows, create_windows, despawn_windows, CachedWindow};
+use winit::dpi::PhysicalSize;
 pub use winit_config::*;
 pub use winit_windows::*;
 
@@ -24,8 +25,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::{SystemParam, SystemState};
 use bevy_input::{
     keyboard::KeyboardInput,
-    mouse::{MouseButtonInput, MouseMotion, MouseScrollUnit, MouseWheel},
-    touch::TouchInput,
+    pointer::PointerEvent,
     touchpad::{TouchpadMagnify, TouchpadRotate},
 };
 use bevy_math::{ivec2, DVec2, Vec2};
@@ -169,42 +169,10 @@ impl Plugin for WinitPlugin {
 
 fn run<F, T>(event_loop: EventLoop<T>, event_handler: F) -> !
 where
-    F: 'static + FnMut(Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow),
+    F: 'static + FnMut(Event<T>, &EventLoopWindowTarget<T>, &mut ControlFlow),
 {
-    event_loop.run(event_handler)
-}
-
-#[cfg(any(
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
-fn run_return<F, T>(event_loop: &mut EventLoop<T>, event_handler: F)
-where
-    F: FnMut(Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow),
-{
-    use winit::platform::run_return::EventLoopExtRunReturn;
-    event_loop.run_return(event_handler);
-}
-
-#[cfg(not(any(
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-)))]
-fn run_return<F, T>(_event_loop: &mut EventLoop<T>, _event_handler: F)
-where
-    F: FnMut(Event<'_, T>, &EventLoopWindowTarget<T>, &mut ControlFlow),
-{
-    panic!("Run return is not supported on this platform!")
+    event_loop.run(event_handler).unwrap();
+    std::process::exit(0)
 }
 
 #[derive(SystemParam)]
@@ -220,18 +188,14 @@ struct WindowAndInputEventWriters<'w> {
     window_destroyed: EventWriter<'w, WindowDestroyed>,
     keyboard_input: EventWriter<'w, KeyboardInput>,
     character_input: EventWriter<'w, ReceivedCharacter>,
-    mouse_button_input: EventWriter<'w, MouseButtonInput>,
     touchpad_magnify_input: EventWriter<'w, TouchpadMagnify>,
     touchpad_rotate_input: EventWriter<'w, TouchpadRotate>,
-    mouse_wheel_input: EventWriter<'w, MouseWheel>,
-    touch_input: EventWriter<'w, TouchInput>,
     ime_input: EventWriter<'w, Ime>,
     file_drag_and_drop: EventWriter<'w, FileDragAndDrop>,
     cursor_moved: EventWriter<'w, CursorMoved>,
     cursor_entered: EventWriter<'w, CursorEntered>,
     cursor_left: EventWriter<'w, CursorLeft>,
-    // `winit` `DeviceEvent`s
-    mouse_motion: EventWriter<'w, MouseMotion>,
+    pointer: EventWriter<'w, PointerEvent>,
 }
 
 /// Persistent state that is used to run the [`App`] according to the current
@@ -436,37 +400,21 @@ pub fn winit_runner(mut app: App) {
                                 window: window_entity,
                             });
                     }
-                    WindowEvent::KeyboardInput { ref input, .. } => {
+                    WindowEvent::KeyboardInput { ref event, .. } => {
                         event_writers
                             .keyboard_input
-                            .send(converters::convert_keyboard_input(input, window_entity));
+                            .send(converters::convert_keyboard_input(event, window_entity));
                     }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let physical_position = DVec2::new(position.x, position.y);
-                        window.set_physical_cursor_position(Some(physical_position));
-                        event_writers.cursor_moved.send(CursorMoved {
-                            window: window_entity,
-                            position: (physical_position / window.resolution.scale_factor())
-                                .as_vec2(),
-                        });
-                    }
-                    WindowEvent::CursorEntered { .. } => {
-                        event_writers.cursor_entered.send(CursorEntered {
-                            window: window_entity,
-                        });
-                    }
-                    WindowEvent::CursorLeft { .. } => {
-                        window.set_physical_cursor_position(None);
-                        event_writers.cursor_left.send(CursorLeft {
-                            window: window_entity,
-                        });
-                    }
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        event_writers.mouse_button_input.send(MouseButtonInput {
-                            button: converters::convert_mouse_button(button),
-                            state: converters::convert_element_state(state),
-                            window: window_entity,
-                        });
+                    WindowEvent::Pointer {
+                        pointer_id, event, ..
+                    } => {
+                        if let Some(event) = converters::convert_pointer_input(
+                            event,
+                            pointer_id,
+                            window.resolution.scale_factor(),
+                        ) {
+                            event_writers.pointer.send(event)
+                        }
                     }
                     WindowEvent::TouchpadMagnify { delta, .. } => {
                         event_writers
@@ -478,39 +426,15 @@ pub fn winit_runner(mut app: App) {
                             .touchpad_rotate_input
                             .send(TouchpadRotate(delta));
                     }
-                    WindowEvent::MouseWheel { delta, .. } => match delta {
-                        event::MouseScrollDelta::LineDelta(x, y) => {
-                            event_writers.mouse_wheel_input.send(MouseWheel {
-                                unit: MouseScrollUnit::Line,
-                                x,
-                                y,
-                                window: window_entity,
-                            });
-                        }
-                        event::MouseScrollDelta::PixelDelta(p) => {
-                            event_writers.mouse_wheel_input.send(MouseWheel {
-                                unit: MouseScrollUnit::Pixel,
-                                x: p.x as f32,
-                                y: p.y as f32,
-                                window: window_entity,
-                            });
-                        }
-                    },
-                    WindowEvent::Touch(touch) => {
-                        let location = touch.location.to_logical(window.resolution.scale_factor());
-                        event_writers
-                            .touch_input
-                            .send(converters::convert_touch_input(touch, location));
-                    }
-                    WindowEvent::ReceivedCharacter(char) => {
-                        event_writers.character_input.send(ReceivedCharacter {
-                            window: window_entity,
-                            char,
-                        });
-                    }
+                    // WindowEvent::ReceivedCharacter(char) => {
+                    //     event_writers.character_input.send(ReceivedCharacter {
+                    //         window: window_entity,
+                    //         char,
+                    //     });
+                    // }
                     WindowEvent::ScaleFactorChanged {
                         scale_factor,
-                        new_inner_size,
+                        mut inner_size_writer,
                     } => {
                         event_writers.window_backend_scale_factor_changed.send(
                             WindowBackendScaleFactorChanged {
@@ -523,13 +447,17 @@ pub fn winit_runner(mut app: App) {
                         window.resolution.set_scale_factor(scale_factor);
                         let new_factor = window.resolution.scale_factor();
 
-                        if let Some(forced_factor) = window.resolution.scale_factor_override() {
+                        let size = if let Some(forced_factor) =
+                            window.resolution.scale_factor_override()
+                        {
                             // This window is overriding the OS-suggested DPI, so its physical size
                             // should be set based on the overriding value. Its logical size already
                             // incorporates any resize constraints.
-                            *new_inner_size =
+                            let size =
                                 winit::dpi::LogicalSize::new(window.width(), window.height())
                                     .to_physical::<u32>(forced_factor);
+                            inner_size_writer.request_inner_size(size).unwrap();
+                            size
                         } else if approx::relative_ne!(new_factor, prior_factor) {
                             event_writers.window_scale_factor_changed.send(
                                 WindowScaleFactorChanged {
@@ -537,10 +465,19 @@ pub fn winit_runner(mut app: App) {
                                     scale_factor,
                                 },
                             );
-                        }
+                            PhysicalSize::new(
+                                window.resolution.physical_width(),
+                                window.resolution.physical_height(),
+                            )
+                        } else {
+                            PhysicalSize::new(
+                                window.resolution.physical_width(),
+                                window.resolution.physical_height(),
+                            )
+                        };
 
-                        let new_logical_width = (new_inner_size.width as f64 / new_factor) as f32;
-                        let new_logical_height = (new_inner_size.height as f64 / new_factor) as f32;
+                        let new_logical_width = (size.width as f64 / new_factor) as f32;
+                        let new_logical_height = (size.height as f64 / new_factor) as f32;
                         if approx::relative_ne!(window.width(), new_logical_width)
                             || approx::relative_ne!(window.height(), new_logical_height)
                         {
@@ -552,7 +489,7 @@ pub fn winit_runner(mut app: App) {
                         }
                         window
                             .resolution
-                            .set_physical_resolution(new_inner_size.width, new_inner_size.height);
+                            .set_physical_resolution(size.width, size.height);
                     }
                     WindowEvent::Focused(focused) => {
                         window.focused = focused;
@@ -629,15 +566,6 @@ pub fn winit_runner(mut app: App) {
                     cache.window = window.clone();
                 }
             }
-            event::Event::DeviceEvent {
-                event: DeviceEvent::MouseMotion { delta: (x, y) },
-                ..
-            } => {
-                let (mut event_writers, _, _) = event_writer_system_state.get_mut(&mut app.world);
-                event_writers.mouse_motion.send(MouseMotion {
-                    delta: Vec2::new(x as f32, y as f32),
-                });
-            }
             event::Event::Suspended => {
                 runner_state.is_active = false;
                 #[cfg(target_os = "android")]
@@ -653,7 +581,7 @@ pub fn winit_runner(mut app: App) {
             event::Event::Resumed => {
                 runner_state.is_active = true;
             }
-            event::Event::MainEventsCleared => {
+            event::Event::AboutToWait => {
                 if runner_state.is_active {
                     let (config, windows) = focused_windows_state.get(&app.world);
                     let focused = windows.iter().any(|window| window.focused);
@@ -750,9 +678,5 @@ pub fn winit_runner(mut app: App) {
     };
 
     trace!("starting winit event loop");
-    if return_from_run {
-        run_return(&mut event_loop, event_handler);
-    } else {
-        run(event_loop, event_handler);
-    }
+    run(event_loop, event_handler);
 }

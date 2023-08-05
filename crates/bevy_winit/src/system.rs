@@ -162,7 +162,7 @@ pub(crate) fn changed_windows(
                     window.resolution.physical_width(),
                     window.resolution.physical_height(),
                 );
-                winit_window.set_inner_size(physical_size);
+                winit_window.request_inner_size(physical_size);
             }
 
             if window.physical_cursor_position() != cache.window.physical_cursor_position() {
@@ -181,9 +181,9 @@ pub(crate) fn changed_windows(
                 }
             }
 
-            if window.cursor.icon != cache.window.cursor.icon {
-                winit_window.set_cursor_icon(converters::convert_cursor_icon(window.cursor.icon));
-            }
+            // if window.cursor.icon != cache.window.cursor.icon {
+            //     winit_window.set_cursor_icon(converters::convert_cursor_icon(window.cursor.icon));
+            // }
 
             if window.cursor.grab_mode != cache.window.cursor.grab_mode {
                 crate::winit_windows::attempt_grab(winit_window, window.cursor.grab_mode);
@@ -292,10 +292,10 @@ pub(crate) fn changed_windows(
             }
 
             if window.ime_position != cache.window.ime_position {
-                winit_window.set_ime_position(LogicalPosition::new(
-                    window.ime_position.x,
-                    window.ime_position.y,
-                ));
+                winit_window.set_ime_cursor_area(
+                    LogicalPosition::new(window.ime_position.x, window.ime_position.y),
+                    LogicalSize::new(5.0, 5.0), // obviously wrong
+                );
             }
 
             if window.window_theme != cache.window.window_theme {
