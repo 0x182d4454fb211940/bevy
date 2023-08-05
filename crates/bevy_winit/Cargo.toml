@@ -11,8 +11,6 @@ keywords = ["bevy"]
 [features]
 trace = []
 wayland = ["winit/wayland", "winit/wayland-csd-adwaita"]
-x11 = ["winit/x11"]
-accesskit_unix = ["accesskit_winit/accesskit_unix", "accesskit_winit/async-io"]
 
 [dependencies]
 # bevy
@@ -29,7 +27,6 @@ bevy_tasks = { path = "../bevy_tasks", version = "0.12.0-dev" }
 
 # other
 winit = { version = "0.28", default-features = false }
-accesskit_winit = { version = "0.14", default-features = false }
 approx = { version = "0.5", default-features = false }
 raw-window-handle = "0.5"
 
@@ -42,4 +39,4 @@ web-sys = "0.3"
 crossbeam-channel = "0.5"
 
 [package.metadata.docs.rs]
-features = ["x11"]
+features = ["wayland"]

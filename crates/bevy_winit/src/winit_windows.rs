@@ -1,11 +1,6 @@
 #![warn(missing_docs)]
-use std::sync::atomic::Ordering;
 
-use accesskit_winit::Adapter;
-use bevy_a11y::{
-    accesskit::{NodeBuilder, NodeClassSet, Role, Tree, TreeUpdate},
-    AccessKitEntityExt, AccessibilityRequested,
-};
+use bevy_a11y::accesskit::{NodeBuilder, Role};
 use bevy_ecs::entity::Entity;
 
 use bevy_utils::{tracing::warn, HashMap};
@@ -16,10 +11,7 @@ use winit::{
     monitor::MonitorHandle,
 };
 
-use crate::{
-    accessibility::{AccessKitAdapters, WinitActionHandler, WinitActionHandlers},
-    converters::{convert_enabled_buttons, convert_window_level, convert_window_theme},
-};
+use crate::converters::{convert_enabled_buttons, convert_window_level, convert_window_theme};
 
 /// A resource mapping window entities to their [`winit`]-backend [`Window`](winit::window::Window)
 /// states.
@@ -44,9 +36,6 @@ impl WinitWindows {
         event_loop: &winit::event_loop::EventLoopWindowTarget<()>,
         entity: Entity,
         window: &Window,
-        adapters: &mut AccessKitAdapters,
-        handlers: &mut WinitActionHandlers,
-        accessibility_requested: &mut AccessibilityRequested,
     ) -> &winit::window::Window {
         let mut winit_window_builder = winit::window::WindowBuilder::new();
 
@@ -148,25 +137,7 @@ impl WinitWindows {
 
         let mut root_builder = NodeBuilder::new(Role::Window);
         root_builder.set_name(name.into_boxed_str());
-        let root = root_builder.build(&mut NodeClassSet::lock_global());
 
-        let accesskit_window_id = entity.to_node_id();
-        let handler = WinitActionHandler::default();
-        let accessibility_requested = (*accessibility_requested).clone();
-        let adapter = Adapter::with_action_handler(
-            &winit_window,
-            move || {
-                accessibility_requested.store(true, Ordering::SeqCst);
-                TreeUpdate {
-                    nodes: vec![(accesskit_window_id, root)],
-                    tree: Some(Tree::new(accesskit_window_id)),
-                    focus: None,
-                }
-            },
-            Box::new(handler.clone()),
-        );
-        adapters.insert(entity, adapter);
-        handlers.insert(entity, handler);
         winit_window.set_visible(true);
 
         // Do not set the grab mode on window creation if it's none. It can fail on mobile.

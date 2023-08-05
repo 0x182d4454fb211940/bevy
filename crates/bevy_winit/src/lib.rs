@@ -7,7 +7,6 @@
 //! The app's [runner](bevy_app::App::runner) is set by `WinitPlugin` and handles the `winit` [`EventLoop`](winit::event_loop::EventLoop).
 //! See `winit_runner` for details.
 
-pub mod accessibility;
 mod converters;
 mod system;
 #[cfg(target_arch = "wasm32")]
@@ -15,7 +14,6 @@ mod web_resize;
 mod winit_config;
 mod winit_windows;
 
-use bevy_a11y::AccessibilityRequested;
 use system::{changed_windows, create_windows, despawn_windows, CachedWindow};
 pub use winit_config::*;
 pub use winit_windows::*;
@@ -51,8 +49,6 @@ use winit::{
     event::{self, DeviceEvent, Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopWindowTarget},
 };
-
-use crate::accessibility::{AccessKitAdapters, AccessibilityPlugin, WinitActionHandlers};
 
 use crate::converters::convert_winit_theme;
 #[cfg(target_arch = "wasm32")]
@@ -100,8 +96,6 @@ impl Plugin for WinitPlugin {
                     .chain(),
             );
 
-        app.add_plugins(AccessibilityPlugin);
-
         #[cfg(target_arch = "wasm32")]
         app.add_plugins(CanvasParentResizePlugin);
 
@@ -124,9 +118,6 @@ impl Plugin for WinitPlugin {
                 Query<(Entity, &mut Window)>,
                 EventWriter<WindowCreated>,
                 NonSendMut<WinitWindows>,
-                NonSendMut<AccessKitAdapters>,
-                ResMut<WinitActionHandlers>,
-                ResMut<AccessibilityRequested>,
             )> = SystemState::from_world(&mut app.world);
 
             #[cfg(target_arch = "wasm32")]
@@ -142,15 +133,8 @@ impl Plugin for WinitPlugin {
             )> = SystemState::from_world(&mut app.world);
 
             #[cfg(not(target_arch = "wasm32"))]
-            let (
-                commands,
-                mut windows,
-                event_writer,
-                winit_windows,
-                adapters,
-                handlers,
-                accessibility_requested,
-            ) = create_window_system_state.get_mut(&mut app.world);
+            let (commands, mut windows, event_writer, winit_windows) =
+                create_window_system_state.get_mut(&mut app.world);
 
             #[cfg(target_arch = "wasm32")]
             let (
@@ -170,9 +154,6 @@ impl Plugin for WinitPlugin {
                 windows.iter_mut(),
                 event_writer,
                 winit_windows,
-                adapters,
-                handlers,
-                accessibility_requested,
                 #[cfg(target_arch = "wasm32")]
                 event_channel,
             );
@@ -319,9 +300,6 @@ pub fn winit_runner(mut app: App) {
         Query<(Entity, &mut Window), Added<Window>>,
         EventWriter<WindowCreated>,
         NonSendMut<WinitWindows>,
-        NonSendMut<AccessKitAdapters>,
-        ResMut<WinitActionHandlers>,
-        ResMut<AccessibilityRequested>,
     )> = SystemState::from_world(&mut app.world);
 
     #[cfg(target_arch = "wasm32")]
@@ -422,20 +400,20 @@ pub fn winit_runner(mut app: App) {
                     event_writer_system_state.get_mut(&mut app.world);
 
                 let Some(window_entity) = winit_windows.get_window_entity(window_id) else {
-                        warn!(
-                            "Skipped event {:?} for unknown winit Window Id {:?}",
-                            event, window_id
-                        );
-                        return;
-                    };
+                    warn!(
+                        "Skipped event {:?} for unknown winit Window Id {:?}",
+                        event, window_id
+                    );
+                    return;
+                };
 
                 let Ok((mut window, mut cache)) = windows.get_mut(window_entity) else {
-                        warn!(
-                            "Window {:?} is missing `Window` component, skipping event {:?}",
-                            window_entity, event
-                        );
-                        return;
-                    };
+                    warn!(
+                        "Window {:?} is missing `Window` component, skipping event {:?}",
+                        window_entity, event
+                    );
+                    return;
+                };
 
                 runner_state.window_event_received = true;
 
@@ -739,15 +717,8 @@ pub fn winit_runner(mut app: App) {
                     // create any new windows
                     // (even if app did not update, some may have been created by plugin setup)
                     #[cfg(not(target_arch = "wasm32"))]
-                    let (
-                        commands,
-                        mut windows,
-                        event_writer,
-                        winit_windows,
-                        adapters,
-                        handlers,
-                        accessibility_requested,
-                    ) = create_window_system_state.get_mut(&mut app.world);
+                    let (commands, mut windows, event_writer, winit_windows) =
+                        create_window_system_state.get_mut(&mut app.world);
 
                     #[cfg(target_arch = "wasm32")]
                     let (
@@ -767,9 +738,6 @@ pub fn winit_runner(mut app: App) {
                         windows.iter_mut(),
                         event_writer,
                         winit_windows,
-                        adapters,
-                        handlers,
-                        accessibility_requested,
                         #[cfg(target_arch = "wasm32")]
                         event_channel,
                     );

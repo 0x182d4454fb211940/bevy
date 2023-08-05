@@ -50,7 +50,7 @@ default = [
   "ktx2",
   "zstd",
   "vorbis",
-  "x11",
+  "wayland",
   "filesystem_watcher",
   "bevy_gizmos",
   "android_shared_stdcxx",
@@ -206,9 +206,6 @@ multi-threaded = ["bevy_internal/multi-threaded"]
 # Wayland display server support
 wayland = ["bevy_internal/wayland"]
 
-# X11 display server support
-x11 = ["bevy_internal/x11"]
-
 # Enable rendering of font glyphs using subpixel accuracy
 subpixel_glyph_atlas = ["bevy_internal/subpixel_glyph_atlas"]
 
@@ -229,9 +226,6 @@ detailed_trace = ["bevy_internal/detailed_trace"]
 
 # Include tonemapping Look Up Tables KTX2 files
 tonemapping_luts = ["bevy_internal/tonemapping_luts"]
-
-# Enable AccessKit on Unix backends (currently only works with experimental screen readers and forks.)
-accesskit_unix = ["bevy_internal/accesskit_unix"]
 
 # Enable assertions to check the validity of parameters passed to glam
 glam_assert = ["bevy_internal/glam_assert"]
