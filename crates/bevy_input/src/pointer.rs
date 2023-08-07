@@ -100,5 +100,6 @@ pub enum MouseButton {
     reflect(Serialize, Deserialize)
 )]
 pub enum PenButton {
-    Pressed,
+    Touch,
+    Side,
 }

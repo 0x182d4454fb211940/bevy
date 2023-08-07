@@ -6,8 +6,8 @@ use bevy_input::{
     },
     ButtonState,
 };
-use bevy_math::{DVec2, Vec2};
-use bevy_window::{CursorIcon, EnabledButtons, WindowLevel, WindowTheme};
+use bevy_math::DVec2;
+use bevy_window::{EnabledButtons, WindowLevel, WindowTheme};
 
 pub fn convert_keyboard_input(
     keyboard_input: &winit::event::KeyEvent,
@@ -115,7 +115,10 @@ pub fn convert_pointer_input(
                     PointerButton::Mouse(convert_mouse_button(mouse))
                 }
                 winit::event::PointerButton::Touch => PointerButton::Touch,
-                winit::event::PointerButton::Pen(_) => PointerButton::Pen(PenButton::Pressed),
+                winit::event::PointerButton::Pen(button) => PointerButton::Pen(match button {
+                    winit::event::PenButton::Touch => PenButton::Touch,
+                    winit::event::PenButton::Side => PenButton::Side,
+                }),
             },
             pressed: matches!(state, winit::event::ElementState::Pressed),
             position: position.map(|x| (DVec2::new(x.x, x.y) / sf).as_vec2()),
