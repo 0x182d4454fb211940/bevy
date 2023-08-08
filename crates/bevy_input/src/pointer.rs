@@ -27,7 +27,7 @@ pub enum PointerId {
     Pen { tool: Tool },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect, Hash)]
 #[reflect(Debug, PartialEq)]
 #[cfg_attr(
     feature = "serialize",
