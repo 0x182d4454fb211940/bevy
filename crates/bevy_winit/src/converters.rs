@@ -94,7 +94,7 @@ pub fn convert_pointer_input(
     };
     let event = match event {
         winit::event::PointerEvent::Entered => PointerEventType::Entered,
-        winit::event::PointerEvent::Left => PointerEventType::Entered,
+        winit::event::PointerEvent::Left => PointerEventType::Left,
         winit::event::PointerEvent::Moved {
             position,
             force,
